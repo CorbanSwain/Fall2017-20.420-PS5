@@ -3,11 +3,12 @@ function swain_corban_huang
 function main
     cleanup; % close all;
     corban_figure_defaults;
-    figstosim = 4:5;
+    figstosim = 4:6;
     for i = figstosim
-       fh = makefigure(figures{i}());
-       figure(fh)
-       savefig(fh);
+        fprintf('Running Figure %d', i);
+        fh = makefigure(figures{i}());
+        figure(fh)
+        savefig(fh);
     end
 end
 
@@ -34,28 +35,20 @@ Cc_fig6.y = csv.data(:, 2);
 
 %% Figures
 
-figures{1} = @testfig1;
-    function testfig1
-        Cf18_source = Cf18_fig3;
-        setupfig(2, ' Test');
-        t2 = linspace(Cf18_source.t(1),Cf18_source.t(end),10000);
-        plot(log(Cf18_source.t),Cf18_source.y,'k.',log(t2),Cf18(t2),'-r');
-    end
-
 figures{4} = @fig4;
     function fs =  fig4
         fignum = 4;
-        params0 = [0.0110, 0.025, 0.0105];
         Cf18_source = Cf18_fig3;
+        t = omfdfrac_fig4.t; y = omfdfrac_fig4.y;
         function omfdfrac = modelfun(p, t)
             Comfd = modelfun_omfd(p, t, 1);
             omfdfrac = Comfd ./ Cf18(t);
         end
-        t = omfdfrac_fig4.t; y = omfdfrac_fig4.y;
+        params0 = [0.0110, 0.025, 0.0105];
         loadin = true;
         varname = 'fit_params'; 
         filename = 'omfd_fit_params_cache.mat';
-        if loadin            
+        if loadin && isfile(filename)
             load(filename, varname);            
         else
             fit_params = nlinfit(t, y, @modelfun, params0, getfitopts);
@@ -71,7 +64,7 @@ figures{4} = @fig4;
         ps.xlim = [0 120]; ps.ylim = [0 1];
         ps.xlabel = 'Time (min)'; ps.ylabel = '3-OMFD Fraction';
         ps.legend = {'Fitting Result', 'Measured Data'};
-        ps.legend_loc = 'east';
+        ps.legend_loc = 'southeast';
         ps.linespec = {'-','ko'};
         ps.markersize{2} = 10; 
         ps.cycle_len = 1;
@@ -87,9 +80,11 @@ figures{5} = @fig5;
         fignum = 5;
         fit_params = omfd_fit_params;
         Cf18_source = Cf18_fig5;
-        t = Cf18_fig5.t(2:end);
+        t = Cf18_fig5.t;
         Comfd = modelfun_omfd(fit_params, t, 1);
         Cfdopa = Cf18(t) - Comfd;
+        Comfd_source = struct('t', t, 'y', Comfd);
+        Cfd_source = struct('t', t, 'y', Cfdpoa);
         ps.x = {Cf18_fig5.t, t, t};
         ps.y = {Cf18_fig5.y, Cfdopa, Comfd};
         ps.xlim = [0 120]; ps.ylim = [0.001 10];
@@ -100,12 +95,66 @@ figures{5} = @fig5;
         ps.legend = {'Total F-18', 'FDOPA', '3-OMFD'};
         ps.cycle_len = 1;
         ps.linespec = {'ks-','-','-'};
-        ps.markersize = {10, [], []};
+        ps.markerfacecolor = {'w',[],[]};
+        ps.markersize = {8, [], []};
         fs.n = fignum;
         fs.position = [526 612 525 351];
         fs.title = sprintf('%d - Plasma Time-Activity Curves', ...
             fignum);
         fs.plots = {ps};
+    end
+
+figures{6} = @fig6;
+    function fs = fig6
+        fignum = 6;
+        p1 = 1.01; p2 = 1.08;
+        Cwb = @(t) p1 * 0.6 * Cfd(t) + p2 * Comfd(t);
+        Cbackground = @(t) 0.05 * Cwb(t);
+        function stri_activity = modelfun_s(p, t)
+            p = [p, 0];
+            C = modelfun_striatum(p, t);
+            stri_activity = sum(C, 2) + Cbackground(t);
+        end
+        function cere_activity = modelfun_c(p, t)
+            C = modelfun_cerebellum(p, t);
+            cere_activity = sum(C, 2) + Cbackground(t);
+        end
+        n = 1;
+        t{n} = Cs_fig6.t; y{n} = Cs_fig6.y;
+        modelfun{n} = @modelfun_s;
+        params0{n} = [0.0283, 0.0228, 0.0124];  
+        n = 2;
+        t{n} = Cc_fig6.t; y{n} = Cc_fig6.y;
+        modelfun{n} = @modelfun_c;
+        params0{n} = [0.0352, 0.0569]; 
+        for i = 1:n
+            fit_params{i} = nlinfit(t{i}, y{i}, modelfun{i}, ...
+                params0{i}, getfitopts);
+            fit_params{i} = abs(fit_params{i});
+        end
+        
+        ps.xlim = [0 120]; ps.ylim = [0 0.3];
+        ps.grid = 'off';
+        ps.xlabel = 'Time (min)'; 
+        ps.ylabel = 'Radioactivity (\muCi/mL)';
+        ps.legend = {'Total F-18', 'FDOPA', '3-OMFD'};
+        ps.cycle_len = 1;
+        ps.linespec = {'ks-','-','-'};
+        ps.markerfacecolor = {'w',[],[]};
+        ps.markersize = {8, [], []};
+        fs.n = fignum;
+        fs.position = [526 612 525 351];
+        fs.title = sprintf('%d - Plasma Time-Activity Curves', ...
+            fignum);
+        fs.plots = {ps};
+    end
+
+figures{7} = @testfig1;
+    function testfig1
+        Cf18_source = Cf18_fig3;
+        setupfig(2, ' Test');
+        t2 = linspace(Cf18_source.t(1),Cf18_source.t(end),10000);
+        plot(log(Cf18_source.t),Cf18_source.y,'k.',log(t2),Cf18(t2),'-r');
     end
 
 main;
@@ -287,6 +336,8 @@ if iscell(ps.x) && iscell(ps.y)
             end
         end             
         % FIXME - Implement linespec like markersize
+        % FIXME - maybe functionalize this more? Be able to take in shorter
+        % cell arrays then vars.
         p = plot(ps.x{i}, ps.y{i}, ps.linespec{cycle});
         fieldname = 'markersize';
         if isf(fieldname)
@@ -295,7 +346,14 @@ if iscell(ps.x) && iscell(ps.y)
                 p.MarkerSize = sizespec;
             end
         end
-            
+        fieldname = 'markerfacecolor';  
+        if isf(fieldname)
+            colorspec = ps.(fieldname){i};
+            if ~isempty(colorspec)
+                p.MarkerFaceColor = colorspec;
+            end
+        end
+        
     end
 else
     if iscell(ps.x) || iscell(ps.y)
