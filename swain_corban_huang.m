@@ -17,6 +17,9 @@ global Cf18_source Cfd_source Comfd_source;
 omfd_fit_params = [];
 
 %% Importing Data
+csv = importdata('wholeblood_totalF18_FIG3.csv');
+Cf18_wb_fig3.t = csv.data(:, 1);
+Cf18_wb_fig3.y = csv.data(:, 2);
 csv = importdata('plasma_totalF18_FIG3.csv');
 Cf18_fig3.t = csv.data(:, 1);
 Cf18_fig3.y = csv.data(:, 2);
@@ -107,15 +110,21 @@ figures{5} = @fig5;
 figures{6} = @fig6;
     function fs = fig6
         fignum = 6;
-        p1 = 1.01; p2 = 1.08;
-        Cwb = @(t) p1 * 0.6 * Cfd(t) + p2 * Comfd(t);
-        Cbackground = @(t) 0.05 * Cwb(t);
-        function stri_activity = modelfun_s(p, t)
+        % Fitting Partition Coeffecients
+        part_coef0 = [1.01, 1.08];
+        Cwb = @(p, t) abs(p(1)) * 0.6 * Cfd(t) + abs(p(2)) * Comfd(t);
+        fit_part_coeff = nlinfit(Cf18_wb_fig3.t, Cf18_wb_fig3.y, ...
+            Cwb, part_coef0, getfitopts);
+        fit_part_coeff = abs(fit_part_coeff);
+        Cbackground = @(t) 0.05 * Cwb(fit_part_coeff, t);
+        
+        % Fitting Activity Timecourses
+        function [stri_activity, C] = modelfun_s(p, t)
             p = [p, 0];
             C = modelfun_striatum(p, t);
             stri_activity = sum(C, 2) + Cbackground(t);
         end
-        function cere_activity = modelfun_c(p, t)
+        function [cere_activity, C] = modelfun_c(p, t)
             C = modelfun_cerebellum(p, t);
             cere_activity = sum(C, 2) + Cbackground(t);
         end
@@ -127,12 +136,27 @@ figures{6} = @fig6;
         t{n} = Cc_fig6.t; y{n} = Cc_fig6.y;
         modelfun{n} = @modelfun_c;
         params0{n} = [0.0352, 0.0569]; 
+        fit_params = cell(n, 1); tout = fit_params; 
+        ytot_out = tout; ycomp_out = tout;
         for i = 1:n
             fit_params{i} = nlinfit(t{i}, y{i}, modelfun{i}, ...
                 params0{i}, getfitopts);
             fit_params{i} = abs(fit_params{i});
+%             tout{i} = linspace(t{i}(1), t{i}(end), 50);
+            tout{i} = t{i};
+            [ytot_out{i},  ycomp_out{i}] ...
+                = modelfun{i}(fit_params{i}, tout{i}); 
         end
         
+        % Preparing plot and figure
+        ps.x{1} = t{1}; ps.y{1} = y{1}; % original striatal
+        ps.x{2} = t{2}; ps.y{2} = y{2}; % original cerebral
+        ps.x{3} = tout{1}; ps.y{3} = ytot_out{1}; % fitted striatal
+        ps.x{4} = tout{2}; ps.y{4} = ytot_out{2}; % fitted cerebral
+        ps.x{5} = tout{1};
+        ps.y{5} = ycomp_out{1}(:,3); % 3-omfd
+        ps.x{6} = tout{1};
+        ps.y{6} = sum(ycomp_out{1}(:,[1, 3]), 2); % 3-omfd + fdopa 
         ps.xlim = [0 120]; ps.ylim = [0 0.3];
         ps.grid = 'off';
         ps.xlabel = 'Time (min)'; 
