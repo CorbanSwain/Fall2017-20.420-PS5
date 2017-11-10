@@ -5,7 +5,7 @@ function main
     corban_figure_defaults;
     figstosim = 4:6;
     for i = figstosim
-        fprintf('Running Figure %d', i);
+        fprintf('Running Figure %d\n', i);
         fh = makefigure(figures{i}());
         figure(fh)
         savefig(fh);
@@ -87,7 +87,7 @@ figures{5} = @fig5;
         Comfd = modelfun_omfd(fit_params, t, 1);
         Cfdopa = Cf18(t) - Comfd;
         Comfd_source = struct('t', t, 'y', Comfd);
-        Cfd_source = struct('t', t, 'y', Cfdpoa);
+        Cfd_source = struct('t', t, 'y', Cfdopa);
         ps.x = {Cf18_fig5.t, t, t};
         ps.y = {Cf18_fig5.y, Cfdopa, Comfd};
         ps.xlim = [0 120]; ps.ylim = [0.001 10];
@@ -161,14 +161,18 @@ figures{6} = @fig6;
         ps.grid = 'off';
         ps.xlabel = 'Time (min)'; 
         ps.ylabel = 'Radioactivity (\muCi/mL)';
-        ps.legend = {'Total F-18', 'FDOPA', '3-OMFD'};
+        ps.legend = {'Striatal Data', 'Cerebellum Data', ...
+            'Striatal Fit', 'Cerebellal Fit', '3-OMFD', ...
+            '3-OMFD & FDOPA'};
+        ps.legend_loc = 'northeastoutside';
         ps.cycle_len = 1;
-        ps.linespec = {'ks-','-','-'};
-        ps.markerfacecolor = {'w',[],[]};
-        ps.markersize = {8, [], []};
+        ps.linespec =        {'ks','ko','-','-','--','--'};
+        ps.markerfacecolor = {  'k',  'k', [], [],  [],  []};
+        ps.markersize =      {   8,     8, [], [],  [],  []};
         fs.n = fignum;
-        fs.position = [526 612 525 351];
-        fs.title = sprintf('%d - Plasma Time-Activity Curves', ...
+        fs.position = [5 179 697 351];
+        fs.title = sprintf(['%d - Striatal and Cerebral ',  ...
+            'Activity TImecourses'], ...
             fignum);
         fs.plots = {ps};
     end
@@ -464,7 +468,7 @@ fontSize = 13;
 font = 'Helvetica';
 set(groot, ...
     'defaultLineMarkerSize', 40,...
-    'defaultLineLineWidth', 3, ...
+    'defaultLineLineWidth', 1.5, ...
     'defaultAxesFontSize', fontSize, ...
     'defaultAxesTitleFontWeight', 'normal', ...
     'defaultAxesFontName', font, ...
