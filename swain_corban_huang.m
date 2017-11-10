@@ -2,23 +2,85 @@ function swain_corban_huang
 
 function main
     cleanup; % close all;
+    corban_figure_defaults;
+    figstosim = 1;
+    for i = figstosim
+       figures{i}(); 
+    end
 end
 
 %% Global Variables
-global Cf18_source;
+global Cf18_source Cfd_source Comfd_source;
+
+%% Importing Data
 csv = importdata('plasma_totalF18_FIG3.csv');
 Cf18_fig3.t = csv.data(:, 1);
-Cf18_fig3.c = csv.data(:, 2);
+Cf18_fig3.y = csv.data(:, 2);
+csv = importdata('plasma_3OMFDFraction_FIG4.csv');
+omfdfrac_fig4.t = csv.data(:, 1);
+omfdfrac_fig4.y = csv.data(:, 2);
+csv = importdata('plasma_totalF18_FIG5.csv');
+Cf18_fig5.t = csv.data(:, 1);
+Cf18_fig5.y = csv.data(:, 2);
+csv = importdata('tissue_radioactivity_striatum_FIG6.csv');
+Cs_fig6.t = csv.data(:, 1);
+Cs_fig6.y = csv.data(:, 2);
+csv = importdata('tissue_radioactivity_cerebellum_FIG6.csv');
+Cc_fig6.t = csv.data(:, 1);
+Cc_fig6.y = csv.data(:, 2);
 
+%% Figures
+figures{1} = @fig4;
+    function fig4
+        fignum = 4;
+        params0 = [0.0110, 0.025, 0.0105];
+        Cf18_source = Cf18_fig3;
+        function omfdfrac = modelfun(p, t)
+            Comfd = modelfun_omfd(p, t, 1);
+            omfdfrac = Comfd ./ Cf18(t);
+        end
+        fitopts = statset('RobustWgtFun', 'fair', ...
+            'Display', 'final');
+        fit_params = nlinfit(omfdfrac_fig4.t, omfdfrac_fig4.y, ...
+            @modelfun, params0, fitopts);
+        setupfig(1, 'Figure 4');
+        t = linspace(omfdfrac_fig4.t(1), omfdfrac_fig4.t(end), 20)' + eps;
+        t = omfdfrac_fig4.t + eps;
+        plot(t, modelfun(fit_params, t),'-r');
+        plot(omfdfrac_fig4.t, omfdfrac_fig4.y, 'ok','markersize', 10);
+        legend('Fit','Data','Location','best');
+    end
+
+figures{4} = @testfig1
+    function testfig1
+        Cf18_source = Cf18_fig3;
+        setupfig(2, ' Test');
+        t2 = linspace(Cf18_source.t(1),Cf18_source.t(end),10000);
+        plot(log(Cf18_source.t),Cf18_source.y,'k.',log(t2),Cf18(t2),'-r');
+    end
 
 main;
 end
 
 %% Data Interpolators
-function  cq = Cf18(tq)
+function cq = Cf18(tq)
 global Cf18_source;
 t = Cf18_source.t;
-c = Cf18_source.c;
+c = Cf18_source.y;
+cq = interp1(t, c, tq, 'pchip');
+end
+
+function cq = Cfd(tq)
+global Cfd_source;
+t = Cfd_source.t;
+c = Cfd_source.y;
+cq = interp1(t, c, tq);
+end
+
+function cq = Comfd(tq)
+global Comfd_source;
+t = Comfd_source.t;
+c = Comfd_source.y;
 cq = interp1(t, c, tq);
 end
 
@@ -85,7 +147,7 @@ tspan = t;
 y0 = zeros(1, nvars);
 odeopts = getodeopts(nvars);
 [~, y_out] = ode45(odefun, tspan, y0, odeopts, p);
-Y = y_out(y_ind_out, :);
+Y = y_out(:, y_ind_out);
 end
 
 function Y = modelfun_striatum(p, t, y_ind_out)
