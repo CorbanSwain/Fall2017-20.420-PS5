@@ -9,7 +9,8 @@ function Huang_Toy_Example
 %% "Experimental Data" Generation
 % We're going to generate "experimental data" according to a recursive
 % formula. Each new data point will be some formula applied to a previous
-% one. In this way, the data generation process is ITERATIVE (like an ODE solver!).
+% one. In this way, the data generation process is ITERATIVE (like an ODE 
+% solver!).
 
 n = 5;  % Number of cycles to complete
 x = zeros(6, 1);
@@ -127,14 +128,14 @@ iterated_parameters = ones(1, 3);
 tricky_iteration_vector = [2, 3, 4, 5, 10, 12, 13, 14];
 tricky_x = model_fun(params, tricky_iteration_vector, 2);
 figure(3)
-plot(tricky_iteration_vector, tricky_x, '-x', 'LineWidth', 3)
+plot(tricky_iteration_vector, tricky_x, 'x', 'LineWidth', 3)
 
 [p_pred2] = nlinfit(tricky_iteration_vector, tricky_x,...
     @(A, B)model_fun(A, B, tricky_x(1)), ones(1, 3));
 [All_Predicted] = model_fun(p_pred2, 2:14, 2);
 figure(3)
 hold on
-plot(2:14, All_Predicted, '-x', 'LineWidth', 3)
+plot(2:14, All_Predicted, '-', 'LineWidth', 3)
 xlabel('Iteration Number')
 ylabel('Data Value')
 title('Tricky Example')
@@ -173,7 +174,7 @@ function [x_final] = model_fun(parameters, iteration_vector, initial_x)
 global iterated_parameters
 iterated_parameters(end+1, :) = parameters;
 
-% disp(parameters)
+disp(parameters)
     % Uncomment the above line if you want to see how the parameters change
     % during the curve fitting procedure!
 

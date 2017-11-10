@@ -1,4 +1,4 @@
-function Huang_Toy_Example
+function swain_corban_huang_mod
 %% Introduction
 % This function implements a toy example for the curve fitting procedure
 % used in Huang et al. for an implementation in 20.420. The example will
