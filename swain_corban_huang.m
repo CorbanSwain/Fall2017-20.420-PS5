@@ -3,14 +3,16 @@ function swain_corban_huang
 function main
     cleanup; % close all;
     corban_figure_defaults;
-    figstosim = 1;
+    figstosim = 4;
     for i = figstosim
-       figures{i}(); 
+       fh = makefigure(figures{i}());
+       savefig(fh);
     end
 end
 
 %% Global Variables
 global Cf18_source Cfd_source Comfd_source;
+omfd_fit_params = [];
 
 %% Importing Data
 csv = importdata('plasma_totalF18_FIG3.csv');
@@ -30,28 +32,8 @@ Cc_fig6.t = csv.data(:, 1);
 Cc_fig6.y = csv.data(:, 2);
 
 %% Figures
-figures{1} = @fig4;
-    function fig4
-        fignum = 4;
-        params0 = [0.0110, 0.025, 0.0105];
-        Cf18_source = Cf18_fig3;
-        function omfdfrac = modelfun(p, t)
-            Comfd = modelfun_omfd(p, t, 1);
-            omfdfrac = Comfd ./ Cf18(t);
-        end
-        fitopts = statset('RobustWgtFun', 'fair', ...
-            'Display', 'final');
-        fit_params = nlinfit(omfdfrac_fig4.t, omfdfrac_fig4.y, ...
-            @modelfun, params0, fitopts);
-        setupfig(1, 'Figure 4');
-        t = linspace(omfdfrac_fig4.t(1), omfdfrac_fig4.t(end), 20)' + eps;
-        t = omfdfrac_fig4.t + eps;
-        plot(t, modelfun(fit_params, t),'-r');
-        plot(omfdfrac_fig4.t, omfdfrac_fig4.y, 'ok','markersize', 10);
-        legend('Fit','Data','Location','best');
-    end
 
-figures{4} = @testfig1
+figures{1} = @testfig1;
     function testfig1
         Cf18_source = Cf18_fig3;
         setupfig(2, ' Test');
@@ -59,29 +41,77 @@ figures{4} = @testfig1
         plot(log(Cf18_source.t),Cf18_source.y,'k.',log(t2),Cf18(t2),'-r');
     end
 
+
+figures{4} = @fig4;
+    function fs =  fig4
+        fignum = 4;
+        params0 = [0.0110, 0.025, 0.0105];
+        Cf18_source = Cf18_fig3;
+        function omfdfrac = modelfun(p, t)
+            Comfd = modelfun_omfd(p, t, 1);
+            omfdfrac = Comfd ./ Cf18(t);
+        end
+        t = omfdfrac_fig4.t; y = omfdfrac_fig4.y;
+        fit_params = nlinfit(t, y, @modelfun, params0, getfitopts);
+        omfd_fit_params = fit_params;
+        setupfig(fignum, 'Figure 4');
+        tfit = omfdfrac_fig4.t + eps;
+        yfit = modelfun(fit_params, tfit);
+        ps.x = {tfit, t};  ps.y = {yfit, y};
+        ps.xlim = [0 120]; ps.ylim = [0 1];
+        ps.legend = {'Fitting Result', 'Measured Data'};
+        ps.legend_loc = 'east';
+        ps.spec_cycle = {'r','ok'};
+        ps.markersize{2} = 10; 
+        ps.cycle_len = 1;
+        
+        fs.n = fignum;
+        fs.title = sprintf('%d - Fitting 3-OMFD Frction Timecourse', ...
+            fignum);
+        fs.plots = {ps};
+    end
+
+figures{5} = @fig5;
+    function fig5
+        fignum = 5;
+        fit_params = omfd_fit_params;
+        Cf18_source = Cf18_fig5;
+        
+    end
+
 main;
 end
 
+%% Settings
+function fitopts = getfitopts
+fitopts = statset('RobustWgtFun', 'fair', ...
+    'Display', 'final');
+end
+
 %% Data Interpolators
+function yq = interp_templ(x, y, xq)
+yq = interp1(x, y, xq, 'pchip');
+end
+
 function cq = Cf18(tq)
 global Cf18_source;
 t = Cf18_source.t;
 c = Cf18_source.y;
-cq = interp1(t, c, tq, 'pchip');
+cq = interp_templ(t, c, tq);
 end
 
 function cq = Cfd(tq)
 global Cfd_source;
 t = Cfd_source.t;
 c = Cfd_source.y;
-cq = interp1(t, c, tq);
+cq = interp_templ(t, c, tq);
 end
 
 function cq = Comfd(tq)
 global Comfd_source;
 t = Comfd_source.t;
 c = Comfd_source.y;
-cq = interp1(t, c, tq);
+cq = interp_templ(t, c, tq);
 end
 
 %% ODE Functions
@@ -163,11 +193,27 @@ Y = modelfun_template(p, t, y_ind_out, 2, @odefun_omfd);
 end
 
 %% Corban Swain Utilities
+function ret = NIL
+ret = "**NIL**";
+end
+
+function bool = isnil(x)    
+bool = (x == NIL);
+end
+
+function [val, S] = qgetfield(S, fieldname, default)
+if ~isfield(S, fieldname)
+    S.(fieldname) = default;
+end
+val = S.(fieldname);
+end
+
 function fighand = makefigure(fs)
-if isfield(fs, 'position')
-    fighand = setupfig(fs.n, fs.title, fs.position);
-else
-    fighand = setupfig(fs.n, fs.title);
+qgf = @(fieldname, default) qgetfield(fs, fieldname, default);
+fighand = setupfig(fs.n, fs.title, qgf('position', 'auto'));
+[~, fs] = qgf('sub', [1, 1]);
+if prod(fs.sub) < length(fs.plots)
+    error('The subplot dimensions are too small for the number of plots.');
 end
 for i = 1:length(fs.plots)
     subplot(fs.sub(1), fs.sub(2), i);
@@ -177,28 +223,42 @@ end
 end
 
 function makeplot(ps)
+qgf = @(fieldname, default) qgetfield(ps, fieldname, default);
+isf = @(fieldname) isfield(ps, fieldname);
 grid on;
+if ~all(isfield(ps, {'x', 'y'}))
+   error('X and Y values must be passed in the plotspec struct.'); 
+end
 if iscell(ps.x) && iscell(ps.y)
     n = length(ps.x);
     cycle = 1;
-    spec = {'-'};
-    fieldstr = 'spec_cycle';
-    if isfield(ps, fieldstr)
-        spec = ps.(fieldstr);
-    end
+    spec = qgf('spec_cycle', {'-'});
     if  n ~= length(ps.y)
         error('x and y cell arrays have mismatched dimensions.');
     end
     for i = 1:n
-        fieldstr = 'color_cycle';
-        if isfield(ps, fieldstr)
-            if (mod(i, ps.(fieldstr)) == 1) && (i ~= 1)
+        fieldname = 'color_order_len';
+        if isf(fieldname)
+            if (mod(i, ps.(fieldname)) == 1) && (i ~= 1)
                 ax = gca;
                 ax.ColorOrderIndex = 1;
-                cycle = cycle + 1;
             end
         end
-            plot(ps.x{i}, ps.y{i},spec{cycle});
+        fieldname = 'cycle_len';
+        if isf(fieldname)
+            if (mod((i - 1), ps.(fieldname)) == 0) && (i ~= 1)
+                cycle = cycle + 1;
+            end
+        end                
+        p = plot(ps.x{i}, ps.y{i}, spec{cycle});
+        fieldname = 'markersize';
+        if isf(fieldname)
+            sizespec = ps.(fieldname){i};
+            if ~isempty(sizespec)
+                p.MarkerSize = sizespec;
+            end
+        end
+            
     end
 else
     if iscell(ps.x) || iscell(ps.y)
@@ -206,17 +266,19 @@ else
     end
     plot(ps.x, ps.y);
 end
-xlabel(ps.xlabel);
-ylabel(ps.ylabel);
-xlim(ps.xlim);
-ylim(ps.ylim);
-leg = legend(ps.legend);
-if isfield(ps, 'legend_title')
-    title(leg, ps.legend_title);
-end
-leg.LineWidth = 0.5;
-if isfield(ps, 'legend_loc')
-    leg.Location = ps.legend_loc;
+xlabel(qgf('x_label','x'));
+ylabel(qgf('y_label','y'));
+xlim(qgf('xlim','auto'));
+ylim(qgf('ylim','auto'));
+fieldname = 'legend';
+if isf(fieldname')
+    leg = legend(ps.(fieldname));
+    fieldname = 'legend_title';
+    if isf(fieldname')
+        title(leg, ps.(fieldname));
+    end
+    leg.LineWidth = qgf('legend_linewidth', 0.5);
+    leg.Location = qgf('legend_loc','auto');
 end
 end
 
@@ -231,7 +293,9 @@ new_fig = figure(n); clf; hold on;
 box off; grid on;
 new_fig.Name = title;
 if nargin > 2
-    new_fig.Position = location;
+    if location ~= 'auto'
+        new_fig.Position = location;
+    end
 end
 end
 
