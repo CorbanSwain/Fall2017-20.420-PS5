@@ -167,8 +167,9 @@ figures{6} = @fig6;
         ps.legend_loc = 'northeastoutside';
         ps.cycle_len = 1;
         ps.linespec =        {'ks','ko','-','-','--','--'};
-        ps.markerfacecolor = {  'k',  'k', [], [],  [],  []};
-        ps.markersize =      {   8,     8, [], [],  [],  []};
+        ps.markerfacecolor = {  'k','k', [], [],  [],  []};
+        ps.markersize =      {   8,   8, [], [],  [],  []};
+        ps.linewidth =       {   1,   1, [], [],  [],  []};
         fs.n = fignum;
         fs.position = [5 179 697 351];
         fs.title = sprintf(['%d - Striatal and Cerebral ',  ...
@@ -382,6 +383,14 @@ if iscell(ps.x) && iscell(ps.y)
             end
         end
         
+        fieldname = 'linewidth';  
+        if isf(fieldname)
+            lw = ps.(fieldname){i};
+            if ~isempty(lw)
+                p.LineWidth = lw;
+            end
+        end
+        
     end
 else
     if iscell(ps.x) || iscell(ps.y)
@@ -468,7 +477,7 @@ fontSize = 13;
 font = 'Helvetica';
 set(groot, ...
     'defaultLineMarkerSize', 40,...
-    'defaultLineLineWidth', 1.5, ...
+    'defaultLineLineWidth', 3, ...
     'defaultAxesFontSize', fontSize, ...
     'defaultAxesTitleFontWeight', 'normal', ...
     'defaultAxesFontName', font, ...
