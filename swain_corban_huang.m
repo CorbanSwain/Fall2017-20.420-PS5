@@ -1,15 +1,30 @@
+%% IMPLEMENTATION OF HUANG, 1991
+% MATLAB implementation of the multi-compartment model of FDOPA activity in
+% the striatum as observed by PET. This model was originally concieved by
+% Sung-cheng Huang and coworkes [1]. Through the following code, figues, 4, 
+% 5, and 6B along with the underlying model are reproduced.
+% 
+% by Corban Swain
+% November 7 - 14, 2017
+% for 20.420 (MIT Class)
+%
+% 1. Huang, Sung-Cheng, et al. "Kinetics and modeling of L-6-[18F] 
+% fluoro-dopa in human positron emission tomographic studies." Journal of 
+% Cerebral Blood Flow & Metabolism 11.6 (1991): 898-913.
+%%
 function swain_corban_huang
-
 function main
-    cleanup; % close all;
+    cleanup; close all;
+    fprintf('Beginning Script...\n');
     corban_figure_defaults;
     figstosim = 4:6;
     for i = figstosim
-        fprintf('Running Figure %d\n', i);
+        fprintf('\nRunning Figure %d\n', i);
         fh = makefigure(figures{i}());
         figure(fh)
         savefig(fh);
     end
+    fprintf('Done!\n');
 end
 
 %% Global Variables
@@ -36,8 +51,9 @@ csv = importdata('tissue_radioactivity_cerebellum_FIG6.csv');
 Cc_fig6.t = csv.data(:, 1);
 Cc_fig6.y = csv.data(:, 2);
 
-t_templ = linspace(eps, 10, 50)';
-t_templ = [t_templ(1:(end - 1)); linspace(10, 120, 51)'];
+num = 60;
+t_templ = linspace(eps, 10, num)';
+t_templ = [t_templ(1:(end - 1)); linspace(10, 120, num + 1)'];
 %% Figures
 
 figures{4} = @fig4;
@@ -56,11 +72,15 @@ figures{4} = @fig4;
         if loadin && isfile(filename)
             load(filename, varname);            
         else
+            fprintf(['Beginnging Nonlinear Fit for 3-OMFD Reaction ', ...
+                'and Transport Coeffecients...\n']);
             fit_params = nlinfit(t, y, @modelfun, params0, getfitopts);
             fit_params = abs(fit_params);
             save(filename, varname);
         end
         clear varname filename;
+        fprintf('Fitted 3-OMFD Reaction Model Params [kb12 kb2 kb3]:\n');
+        disp(fit_params); 
         omfd_fit_params = fit_params;
         setupfig(fignum, 'Figure 4');
         tfit = omfdfrac_fig4.t + eps;
@@ -91,8 +111,8 @@ figures{5} = @fig5;
         Cfdopa = Cf18(t) - Comfd;
         Comfd_source = struct('t', t, 'y', Comfd);
         Cfd_source = struct('t', t, 'y', Cfdopa);
-%         t = t_templ;
-        t = Cf18_fig5.t + eps;
+        t = t_templ;
+%         t = Cf18_fig5.t + eps;
         Comfd = modelfun_omfd(fit_params, t, 1);
         Cfdopa = Cf18(t) - Comfd;
         ps.x = {Cf18_fig5.t, t, t};
@@ -127,6 +147,8 @@ figures{6} = @fig6;
             end
         else
             % Fitting Partition Coeffecients
+            fprintf(['Beginnging Nonlinear Fit for Plasma/Whole ', ...
+                'Blood Partition Coeffecients...\n']);
             part_coef0 = [1.01, 1.08];
             Cwb = @(p, t) abs(p(1)) * 0.6 * Cfd(t) + abs(p(2)) * Comfd(t);
             fit_part_coeff = nlinfit(Cf18_wb_fig3.t, Cf18_wb_fig3.y, ...
@@ -139,7 +161,8 @@ figures{6} = @fig6;
             end
         end
         clear filename varnames;
-        
+        fprintf('Fitted Partition Coeffeceints [p1 p2]:\n');
+        disp(fit_part_coeff);
         function [stri_activity, C] = modelfun_s(p, t)
             p = [p, 0];
             C = modelfun_striatum(p, t);
@@ -150,6 +173,7 @@ figures{6} = @fig6;
             cere_activity = sum(C, 2) + Cbackground(t);
         end
         
+
         varnames = {'fit_params', 't', 'y', 'modelfun'};
         filename = 'figure6_cache_2.mat';
         if loadin && isfile(filename)
@@ -158,6 +182,8 @@ figures{6} = @fig6;
             end
         else
             % Fitting Cerebellal and Striatal Activities
+            fprintf(['Beginnging Nonlinear Fits for Cerebellal ', ...
+                'and Striatal Activities...\n']);
             n = 1;
             t{n} = Cs_fig6.t; y{n} = Cs_fig6.y;
             modelfun{n} = @modelfun_s;
@@ -166,8 +192,7 @@ figures{6} = @fig6;
             t{n} = Cc_fig6.t; y{n} = Cc_fig6.y;
             modelfun{n} = @modelfun_c;
             params0{n} = [0.0352, 0.0569]; 
-            fit_params = cell(n, 1); tout = fit_params; 
-            ytot_out = tout; ycomp_out = tout;
+            fit_params = cell(n, 1);
             for i = 1:n
                 fit_params{i} = nlinfit(t{i}, y{i}, modelfun{i}, ...
                     params0{i}, getfitopts);
@@ -179,22 +204,31 @@ figures{6} = @fig6;
             end
         end
         clear filename varnames;
-        
-        for i = 1:length(fit_params)
-%             tout{i} = t_templ;
+        fprintf('Fitted STRIATAL Model Params [k1 k2 k3]:\n');
+        disp(fit_params{1});  
+        fprintf('Fitted CEREBELLAL Model Params [Kp1 kp2]:\n');
+        disp(fit_params{2});
+        n = length(fit_params);
+        tout = cell(n, 1); 
+        ytot_out = tout; ycomp_out = tout;
+        for i = 1:n
+            % QUESTION - Plots look weird with t_templ ... why?
             tout{i} = t{i} + eps;
-            [ytot_out{i},  ycomp_out{i}] ...
+            [ytot_out{i},  ~] ...
                 = modelfun{i}(fit_params{i}, tout{i});  
+            tout{i} = t_templ;
+            [~, ycomp_out{i}] ...
+                = modelfun{i}(fit_params{i}, tout{i});
         end
         
         % Preparing plot and figure
         ps.x{1} = t{1}; ps.y{1} = y{1}; % original striatal
         ps.x{2} = t{2}; ps.y{2} = y{2}; % original cerebral
-        ps.x{3} = tout{1}; ps.y{3} = ytot_out{1}; % fitted striatal
-        ps.x{4} = tout{2}; ps.y{4} = ytot_out{2}; % fitted cerebral
-        ps.x{5} = tout{1};
+        ps.x{3} = t{1} + eps; ps.y{3} = ytot_out{1}; % fitted striatal
+        ps.x{4} = t{2} + eps; ps.y{4} = ytot_out{2}; % fitted cerebral
+        ps.x{5} = t_templ;
         ps.y{5} = ycomp_out{1}(:,3); % 3-omfd
-        ps.x{6} = tout{1};
+        ps.x{6} = t_templ;
         ps.y{6} = sum(ycomp_out{1}(:,[1, 3]), 2); % 3-omfd + fdopa 
         ps.xlim = [0 120]; ps.ylim = [0 0.3];
         ps.grid = 'off';
@@ -205,7 +239,7 @@ figures{6} = @fig6;
             'Striatal 3-OMFD & FDOPA'};
         ps.legend_loc = 'northeastoutside';
         ps.cycle_len = 1;
-        ps.linespec =        {'ks','ko','-k','-k','--','--'};
+        ps.linespec =        {'ks','ko','-k','-k',':',':'};
         ps.markerfacecolor = {  'k','k', [], [],  [],  []};
         ps.markersize =      {   8,   8, [], [],  [],  []};
         ps.linewidth =       {   1,   1, [], [],  [],  []};
@@ -231,7 +265,8 @@ end
 %% Settings
 function fitopts = getfitopts
 fitopts = statset('RobustWgtFun', 'fair', ...
-    'Display', 'final');
+    'Display', 'final', ...
+    'DerivStep', eps .^ (1 / 3));
 end
 
 %% Data Interpolators
@@ -312,44 +347,37 @@ end
 
 %% Model Functions
 function opts = getodeopts(nvars)   
-tol = 1e-6;
+tol = 1e-9;
 opts = odeset('RelTol', tol,...
     'AbsTol',tol, ...
     'NonNegative', 1:nvars);    
 end
 
-function Y = modelfun_template(p, t, y_ind_out, nvars, odefun)
+function [Y, t] = modelfun_template(p, t, y_ind_out, nvars, odefun)
 tspan = t;
 y0 = zeros(1, nvars);
 odeopts = getodeopts(nvars);
-[~, y_out] = ode45(odefun, tspan, y0, odeopts, abs(p));
+[t, y_out] = ode45(odefun, tspan, y0, odeopts, abs(p));
 if isempty(y_ind_out); y_ind_out = 1:nvars; end
 Y = y_out(:, y_ind_out);
 end
 
-function Y = modelfun_striatum(p, t, y_ind_out)
+function [Y, t] = modelfun_striatum(p, t, y_ind_out)
 if nargin == 2; y_ind_out = []; end
-Y = modelfun_template(p, t, y_ind_out, 3, @odefun_striatum);
+[Y, t] = modelfun_template(p, t, y_ind_out, 3, @odefun_striatum);
 end
 
-function Y = modelfun_cerebellum(p, t, y_ind_out)
+function [Y, t] = modelfun_cerebellum(p, t, y_ind_out)
 if nargin == 2; y_ind_out = []; end
-Y = modelfun_template(p, t, y_ind_out, 2, @odefun_cerebellum);
+[Y, t] = modelfun_template(p, t, y_ind_out, 2, @odefun_cerebellum);
 end
 
-function Y = modelfun_omfd(p, t, y_ind_out)
+function [Y, t] = modelfun_omfd(p, t, y_ind_out)
 if nargin == 2; y_ind_out = []; end
-Y = modelfun_template(p, t, y_ind_out, 2, @odefun_omfd);
+[Y, t] = modelfun_template(p, t, y_ind_out, 2, @odefun_omfd);
 end
 
 %% Corban Swain Utilities
-function ret = NIL
-ret = "**NIL**";
-end
-
-function bool = isnil(x)    
-bool = (x == NIL);
-end
 
 function [val, S] = qgetfield(S, fieldname, default)
 if ~isfield(S, fieldname)
