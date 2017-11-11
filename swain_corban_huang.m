@@ -36,6 +36,8 @@ csv = importdata('tissue_radioactivity_cerebellum_FIG6.csv');
 Cc_fig6.t = csv.data(:, 1);
 Cc_fig6.y = csv.data(:, 2);
 
+t_templ = linspace(eps, 10, 50)';
+t_templ = [t_templ(1:(end - 1)); linspace(10, 120, 51)'];
 %% Figures
 
 figures{4} = @fig4;
@@ -50,7 +52,7 @@ figures{4} = @fig4;
         params0 = [0.0110, 0.025, 0.0105];
         loadin = true;
         varname = 'fit_params'; 
-        filename = 'omfd_fit_params_cache.mat';
+        filename = 'figure4_cache.mat';
         if loadin && isfile(filename)
             load(filename, varname);            
         else
@@ -62,6 +64,7 @@ figures{4} = @fig4;
         omfd_fit_params = fit_params;
         setupfig(fignum, 'Figure 4');
         tfit = omfdfrac_fig4.t + eps;
+%         tfit = t_templ;
         yfit = modelfun(fit_params, tfit);
         ps.x = {tfit, t};  ps.y = {yfit, y};
         ps.xlim = [0 120]; ps.ylim = [0 1];
@@ -88,6 +91,10 @@ figures{5} = @fig5;
         Cfdopa = Cf18(t) - Comfd;
         Comfd_source = struct('t', t, 'y', Comfd);
         Cfd_source = struct('t', t, 'y', Cfdopa);
+%         t = t_templ;
+        t = Cf18_fig5.t + eps;
+        Comfd = modelfun_omfd(fit_params, t, 1);
+        Cfdopa = Cf18(t) - Comfd;
         ps.x = {Cf18_fig5.t, t, t};
         ps.y = {Cf18_fig5.y, Cfdopa, Comfd};
         ps.xlim = [0 120]; ps.ylim = [0.001 10];
@@ -110,15 +117,29 @@ figures{5} = @fig5;
 figures{6} = @fig6;
     function fs = fig6
         fignum = 6;
-        % Fitting Partition Coeffecients
-        part_coef0 = [1.01, 1.08];
-        Cwb = @(p, t) abs(p(1)) * 0.6 * Cfd(t) + abs(p(2)) * Comfd(t);
-        fit_part_coeff = nlinfit(Cf18_wb_fig3.t, Cf18_wb_fig3.y, ...
-            Cwb, part_coef0, getfitopts);
-        fit_part_coeff = abs(fit_part_coeff);
-        Cbackground = @(t) 0.05 * Cwb(fit_part_coeff, t);
+        loadin = true;
+        % FIXME - Automate Saving / Checkpoints.
+        varnames = {'Cbackground', 'Cwb', 'fit_part_coeff'}; 
+        filename = 'figure6_cache_1.mat';
+        if loadin && isfile(filename)
+            for i = 1:length(varnames)
+                load(filename, varnames{i});
+            end
+        else
+            % Fitting Partition Coeffecients
+            part_coef0 = [1.01, 1.08];
+            Cwb = @(p, t) abs(p(1)) * 0.6 * Cfd(t) + abs(p(2)) * Comfd(t);
+            fit_part_coeff = nlinfit(Cf18_wb_fig3.t, Cf18_wb_fig3.y, ...
+                Cwb, part_coef0, getfitopts);
+            fit_part_coeff = abs(fit_part_coeff);
+            Cbackground = @(t) 0.05 * Cwb(fit_part_coeff, t);
+            save(filename, varnames{1});
+            for i = 2:length(varnames)
+                save(filename, varnames{i}, '-append');
+            end
+        end
+        clear filename varnames;
         
-        % Fitting Activity Timecourses
         function [stri_activity, C] = modelfun_s(p, t)
             p = [p, 0];
             C = modelfun_striatum(p, t);
@@ -128,24 +149,42 @@ figures{6} = @fig6;
             C = modelfun_cerebellum(p, t);
             cere_activity = sum(C, 2) + Cbackground(t);
         end
-        n = 1;
-        t{n} = Cs_fig6.t; y{n} = Cs_fig6.y;
-        modelfun{n} = @modelfun_s;
-        params0{n} = [0.0283, 0.0228, 0.0124];  
-        n = 2;
-        t{n} = Cc_fig6.t; y{n} = Cc_fig6.y;
-        modelfun{n} = @modelfun_c;
-        params0{n} = [0.0352, 0.0569]; 
-        fit_params = cell(n, 1); tout = fit_params; 
-        ytot_out = tout; ycomp_out = tout;
-        for i = 1:n
-            fit_params{i} = nlinfit(t{i}, y{i}, modelfun{i}, ...
-                params0{i}, getfitopts);
-            fit_params{i} = abs(fit_params{i});
-%             tout{i} = linspace(t{i}(1), t{i}(end), 50);
-            tout{i} = t{i};
+        
+        varnames = {'fit_params', 't', 'y', 'modelfun'};
+        filename = 'figure6_cache_2.mat';
+        if loadin && isfile(filename)
+            for i = 1:length(varnames)
+                load(filename, varnames{i});
+            end
+        else
+            % Fitting Cerebellal and Striatal Activities
+            n = 1;
+            t{n} = Cs_fig6.t; y{n} = Cs_fig6.y;
+            modelfun{n} = @modelfun_s;
+            params0{n} = [0.0283, 0.0228, 0.0124];  
+            n = 2;
+            t{n} = Cc_fig6.t; y{n} = Cc_fig6.y;
+            modelfun{n} = @modelfun_c;
+            params0{n} = [0.0352, 0.0569]; 
+            fit_params = cell(n, 1); tout = fit_params; 
+            ytot_out = tout; ycomp_out = tout;
+            for i = 1:n
+                fit_params{i} = nlinfit(t{i}, y{i}, modelfun{i}, ...
+                    params0{i}, getfitopts);
+                fit_params{i} = abs(fit_params{i});
+            end
+            save(filename, varnames{1});
+            for i = 2:length(varnames)
+                save(filename, varnames{i}, '-append');
+            end
+        end
+        clear filename varnames;
+        
+        for i = 1:length(fit_params)
+%             tout{i} = t_templ;
+            tout{i} = t{i} + eps;
             [ytot_out{i},  ycomp_out{i}] ...
-                = modelfun{i}(fit_params{i}, tout{i}); 
+                = modelfun{i}(fit_params{i}, tout{i});  
         end
         
         % Preparing plot and figure
@@ -161,17 +200,17 @@ figures{6} = @fig6;
         ps.grid = 'off';
         ps.xlabel = 'Time (min)'; 
         ps.ylabel = 'Radioactivity (\muCi/mL)';
-        ps.legend = {'Striatal Data', 'Cerebellum Data', ...
-            'Striatal Fit', 'Cerebellal Fit', '3-OMFD', ...
-            '3-OMFD & FDOPA'};
+        ps.legend = {'Striatal Activity', 'Cerebellal Activity', ...
+            'Striatal Fit', 'Cerebellal Fit', 'Striatal 3-OMFD', ...
+            'Striatal 3-OMFD & FDOPA'};
         ps.legend_loc = 'northeastoutside';
         ps.cycle_len = 1;
-        ps.linespec =        {'ks','ko','-','-','--','--'};
+        ps.linespec =        {'ks','ko','-k','-k','--','--'};
         ps.markerfacecolor = {  'k','k', [], [],  [],  []};
         ps.markersize =      {   8,   8, [], [],  [],  []};
         ps.linewidth =       {   1,   1, [], [],  [],  []};
         fs.n = fignum;
-        fs.position = [5 179 697 351];
+        fs.position = [5 107 893 417];
         fs.title = sprintf(['%d - Striatal and Cerebral ',  ...
             'Activity TImecourses'], ...
             fignum);
