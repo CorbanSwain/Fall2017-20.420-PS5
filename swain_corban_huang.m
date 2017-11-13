@@ -19,7 +19,7 @@ function main
     corban_figure_defaults;
     figstosim = 4:6;
     for i = figstosim
-        fprintf('\nRunning Figure %d\n', i);
+        fprintf('\nRunning Figure %d %s \n', i, repmat('-', 1, 40));
         fh = makefigure(figures{i}());
         figure(fh)
         savefig(fh);
@@ -173,7 +173,6 @@ figures{6} = @fig6;
             cere_activity = sum(C, 2) + Cbackground(t);
         end
         
-
         varnames = {'fit_params', 't', 'y', 'modelfun'};
         filename = 'figure6_cache_2.mat';
         if loadin && isfile(filename)
