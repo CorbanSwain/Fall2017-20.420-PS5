@@ -66,7 +66,7 @@ figures{4} = @fig4;
             omfdfrac = Comfd ./ Cf18(t);
         end
         params0 = [0.0110, 0.025, 0.0105];
-        loadin = true;
+        loadin = false;
         varname = 'fit_params'; 
         filename = 'figure4_cache.mat';
         if loadin && isfile(filename)
@@ -263,9 +263,9 @@ end
 
 %% Settings
 function fitopts = getfitopts
-fitopts = statset('RobustWgtFun', 'fair', ...
+fitopts = statset('RobustWgtFun', 'cauchy', ...
     'Display', 'final', ...
-    'DerivStep', eps .^ (1 / 3));
+    'DerivStep', eps .^ (1 / 2));
 end
 
 %% Data Interpolators
